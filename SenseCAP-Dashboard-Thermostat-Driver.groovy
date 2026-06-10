@@ -4,7 +4,7 @@
  */
 
 /**
- * SenseCAP Dashboard and Thermostat Driver v1.0.0
+ * SenseCAP Dashboard and Thermostat Driver v1.3.0
  *
  * Hubitat driver for the SenseCAP Indicator D1 (480x480) running openHASP firmware.
  * Communicates via MQTT. Up to 6 pages, each independently configurable.
@@ -24,7 +24,7 @@
  * - Thermostat tap IPC via device event (no hub variable required)
  *
  * Author: jlslate
- * Version: 1.2.0
+ * Version: 1.3.0
  */
 
 import groovy.transform.Field
@@ -91,12 +91,6 @@ metadata {
         attribute "thermostatTapped", "string"
 
         // Register thermostat device so driver can handle taps directly
-        command "setPage1ThermostatDevice", [[name:"deviceId", type:"STRING"]]
-        command "setPage2ThermostatDevice", [[name:"deviceId", type:"STRING"]]
-        command "setPage3ThermostatDevice", [[name:"deviceId", type:"STRING"]]
-        command "setPage4ThermostatDevice", [[name:"deviceId", type:"STRING"]]
-        command "setPage5ThermostatDevice", [[name:"deviceId", type:"STRING"]]
-        command "setPage6ThermostatDevice", [[name:"deviceId", type:"STRING"]]
 
         attribute "mqttStatus",        "string"
         attribute "displayRebooted",   "string"
@@ -532,7 +526,6 @@ private void handleButtonTap(String topic, String payload) {
     }
     if (sType == "thermostat") {
         debugLog "[Dashboard] Thermostat tile tapped: page ${page} slot ${slot}"
-        sendEvent(name: "thermostatTapped", value: "${page},${slot},${now()}")
         handleThermostatTap(page, slot)
         return
     }
@@ -540,29 +533,11 @@ private void handleButtonTap(String topic, String payload) {
 
 // ── Thermostat device registration ────────────────────────────────────────────
 
-def setPage1ThermostatDevice(String deviceId) {
-    state.p1ThermostatDeviceId = deviceId
-}
 
-def setPage2ThermostatDevice(String deviceId) {
-    state.p2ThermostatDeviceId = deviceId
-}
 
-def setPage3ThermostatDevice(String deviceId) {
-    state.p3ThermostatDeviceId = deviceId
-}
 
-def setPage4ThermostatDevice(String deviceId) {
-    state.p4ThermostatDeviceId = deviceId
-}
 
-def setPage5ThermostatDevice(String deviceId) {
-    state.p5ThermostatDeviceId = deviceId
-}
 
-def setPage6ThermostatDevice(String deviceId) {
-    state.p6ThermostatDeviceId = deviceId
-}
 
 // ── Thermostat display ────────────────────────────────────────────────────────
 
@@ -579,18 +554,6 @@ def updateThermostatDisplay(page, data) {
     String mode    = data.mode          ?: "off"
     String opState = data.operatingState ?: "idle"
     boolean away   = (data.away == "true")
-
-    // Wake display if mode or operating state changed
-    String prevMode   = state["p${pg}thermostatMode"]    ?: ""
-    String prevOpState = state["p${pg}thermostatOpState"] ?: ""
-    boolean prevAway  = (state["p${pg}thermostatAway"] == true)
-    if (mode != prevMode || opState != prevOpState || away != prevAway) {
-        if (state.screenIdle) {
-            infoLog "[Dashboard] Thermostat state changed -- waking display"
-            state.screenIdle = false
-            publishBacklight(true)
-        }
-    }
 
     state["p${pg}thermostatTemp"]    = temp
     state["p${pg}thermostatMode"]    = mode
@@ -639,9 +602,9 @@ private void pushThermostatTile(int pg, String node, String temp, String heat, S
 
     String plusGlyph  = iconToJsonEscape("\uE415")
     String minusGlyph = iconToJsonEscape("\uE374")
-    boolean btnActive = !away && (mode == "heat" || mode == "cool")
+    boolean btnActive = !away
     String btnFg = btnActive ? fgColor : contrastColor(bgColor)
-    String modeLabel = away ? "Away" : mode.capitalize()
+    String modeLabel = away ? "Away" : (mode == "off" ? "${cool}\u00B0\n${heat}\u00B0" : mode.capitalize())
 
     safePub("hasp/" + node + "/command/jsonl",
         '{"page":' + pg + ',"id":1,"bg_color":"' + bgColor + '","text_color":"' + fgColor + '","text_font":32,"text":"' + "${temp}\u00B0\n${line2}" + '"}')
